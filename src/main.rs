@@ -5,7 +5,8 @@ use std::fs::read_to_string;
 enum Token {
     Pipe,        // Loop delimiter
     Pound,       // Reset the tape and pointer
-    Hyphen,      // Memory manipulation or pointer movement
+    Hyphen,      // Memory manipulation or pointer movement (Increment)
+    Exclamation, // Memory manipulation or pointer movement (Decrement)
     Slash,       // Input
     Backslash,   // Output
     Newline,     // Newline
@@ -16,6 +17,7 @@ fn tokenize(input: &str) -> Vec<Token> {
         '|' => Some(Token::Pipe),
         '#' => Some(Token::Pound),
         '-' => Some(Token::Hyphen),
+        '!' => Some(Token::Exclamation),
         '/' => Some(Token::Slash),
         '\\' => Some(Token::Backslash),
         '\n' => Some(Token::Newline),
@@ -64,11 +66,10 @@ impl PipeInterpreter {
                     self.pointer = 0;
                 }
                 Token::Hyphen => {
-                    if instruction_pointer + 1 < tokens.len() && tokens[instruction_pointer + 1] == Token::Hyphen {
-                        self.tape[self.pointer] += 1;
-                    } else {
-                        self.tape[self.pointer] -= 1;
-                    }
+                    self.tape[self.pointer] = (self.tape[self.pointer] + 1) % 30000;
+                }
+                Token::Exclamation => {
+                    self.tape[self.pointer] = (self.tape[self.pointer] + 29999) % 30000;
                 }
                 Token::Slash => {
                     let mut input = String::new();
@@ -99,6 +100,19 @@ impl PipeInterpreter {
             }
 
             instruction_pointer += 1;
+
+            // Handle loop end
+            if instruction_pointer < tokens.len() && tokens[instruction_pointer] == Token::Pipe {
+                if self.tape[self.pointer] != 0 {
+                    if let Some(loop_start) = loop_stack.pop() {
+                        instruction_pointer = loop_start;
+                    } else {
+                        panic!("Unmatched loop end '|' at position {}", instruction_pointer);
+                    }
+                } else {
+                    loop_stack.pop();
+                }
+            }
         }
     }
 }
